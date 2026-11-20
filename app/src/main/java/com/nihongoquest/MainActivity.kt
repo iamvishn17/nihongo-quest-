@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,9 +49,11 @@ private fun QuestApp(dao: LearningDao) {
  val startOfDay = remember { Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY,0); set(Calendar.MINUTE,0); set(Calendar.SECOND,0); set(Calendar.MILLISECOND,0) }.timeInMillis }
  val events by dao.observeEventsSince(startOfDay).collectAsState(initial = emptyList())
  val scope = rememberCoroutineScope()
+ val context = LocalContext.current
 
  LaunchedEffect(Unit) {
-  if (dao.observeVocabulary().first().isEmpty()) {
+  val preferences = context.getSharedPreferences("quest_setup", android.content.Context.MODE_PRIVATE)
+  if (!preferences.getBoolean("starter_content_added", false) && dao.observeVocabulary().first().isEmpty()) {
    listOf(
     Vocabulary(japanese="水",reading="みず",romaji="mizu",meaning="water",category="Everyday"),
     Vocabulary(japanese="学生",reading="がくせい",romaji="gakusei",meaning="student",category="People"),
@@ -67,6 +70,7 @@ private fun QuestApp(dao: LearningDao) {
     Kanji(character="人",meaning="person",onyomi="ジン・ニン",kunyomi="ひと"),
     Kanji(character="水",meaning="water",onyomi="スイ",kunyomi="みず")
    ).forEach { dao.insertKanji(it) }
+   preferences.edit().putBoolean("starter_content_added", true).apply()
   }
  }
 
