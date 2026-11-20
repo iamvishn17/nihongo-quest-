@@ -12,7 +12,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "1.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -39,3 +39,19 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
+
+
+val generateLauncherIcon by tasks.registering {
+    val encodedLogo = layout.projectDirectory.file("src/main/assets/nihongo_quest_logo.png.b64")
+    val generatedRes = layout.buildDirectory.dir("generated/res/launcher")
+    inputs.file(encodedLogo)
+    outputs.dir(generatedRes)
+    doLast {
+        val iconFile = generatedRes.get().file("mipmap-xxxhdpi/ic_launcher.png").asFile
+        iconFile.parentFile.mkdirs()
+        iconFile.writeBytes(java.util.Base64.getDecoder().decode(encodedLogo.asFile.readText().trim()))
+    }
+}
+
+android.sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/res/launcher"))
+tasks.named("preBuild").configure { dependsOn(generateLauncherIcon) }
