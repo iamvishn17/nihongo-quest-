@@ -40,8 +40,9 @@ private enum class Page { HOME, CARDS, LIBRARY, QUIZ, PROFILE }
 
 @Composable
 private fun QuestApp(dao: LearningDao) {
+ val context = LocalContext.current
  var page by remember { mutableStateOf(Page.HOME) }
- var dark by remember { mutableStateOf(false) }
+ var dark by remember { mutableStateOf(context.getSharedPreferences("quest_setup", 0).getBoolean("dark_theme", false)) }
  var addWord by remember { mutableStateOf(false) }
  var addKanji by remember { mutableStateOf(false) }
  val words by dao.observeVocabulary().collectAsState(initial = emptyList())
@@ -49,7 +50,6 @@ private fun QuestApp(dao: LearningDao) {
  val startOfDay = remember { Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY,0); set(Calendar.MINUTE,0); set(Calendar.SECOND,0); set(Calendar.MILLISECOND,0) }.timeInMillis }
  val events by dao.observeEventsSince(startOfDay).collectAsState(initial = emptyList())
  val scope = rememberCoroutineScope()
- val context = LocalContext.current
 
  LaunchedEffect(Unit) {
   val preferences = context.getSharedPreferences("quest_setup", android.content.Context.MODE_PRIVATE)
@@ -97,7 +97,7 @@ private fun QuestApp(dao: LearningDao) {
      Page.CARDS -> Cards(words,dao)
      Page.LIBRARY -> Library(words,kanji,{addWord=true},{addKanji=true},{scope.launch{dao.deleteVocabulary(it)}},{scope.launch{dao.deleteKanji(it)}})
      Page.QUIZ -> Quiz(words,dao)
-     Page.PROFILE -> Profile(dark,{dark=it},words.size,kanji.size,events.size)
+     Page.PROFILE -> Profile(dark,{ dark=it; context.getSharedPreferences("quest_setup", 0).edit().putBoolean("dark_theme", it).apply() },words.size,kanji.size,events.size)
     }
    }
   }
