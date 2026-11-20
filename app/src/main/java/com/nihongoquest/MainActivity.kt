@@ -146,6 +146,7 @@ private fun dayStart():Long{val c=java.util.Calendar.getInstance();c.set(11,0);c
    options.forEach{o->val good=o==current.meaning;Surface(color=if(answer!=null&&good)Color(0xFFDDF2E3)else if(answer==o)Color(0xFFFFE0E0)else MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(13.dp),modifier=Modifier.fillMaxWidth().clickable(enabled=answer==null){answer=o}){Text(o,Modifier.padding(15.dp),fontWeight=FontWeight.Medium)}}
    if(answer!=null){val correct=answer==current.meaning;Text(if(correct)"Correct!" else "Incorrect — "+current.meaning,fontWeight=FontWeight.SemiBold,color=MaterialTheme.colorScheme.primary);Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Button(onClick={scope.launch{dao.setDailyProgress(DailyProgress(current.id,mode,day,if(correct)"done" else "again"));dao.addEvent(StudyEvent(correct=correct,itemType="practice"));dao.updateVocabulary(current.copy(attempts=current.attempts+1,correct=current.correct+if(correct)1 else 0));queue=if(correct)queue.drop(1)else queue.drop(1)+current.id;answer=null;romaji=false}},modifier=Modifier.weight(1f)){Text(if(correct)"Next question" else "Try again later")};OutlinedButton(onClick={scope.launch{dao.setDailyProgress(DailyProgress(current.id,mode,day,"skipped"));queue=queue.drop(1);answer=null;romaji=false}}){Text("Skip")}}}
   }
+  if(completed>0) CompletedToday(saved,available)
  }
 }
 
@@ -157,3 +158,15 @@ private fun dayStart():Long{val c=java.util.Calendar.getInstance();c.set(11,0);c
 @Composable private fun KanjiDialog(close:()->Unit,save:(Kanji)->Unit){var ch by remember{mutableStateOf("")};var meaning by remember{mutableStateOf("")};var on by remember{mutableStateOf("")};var kun by remember{mutableStateOf("")};AlertDialog(onDismissRequest=close,title={Text("Add kanji")},text={Column{OutlinedTextField(ch,{ch=it},label={Text("Kanji")});OutlinedTextField(meaning,{meaning=it},label={Text("Meaning")});OutlinedTextField(on,{on=it},label={Text("Onyomi")});OutlinedTextField(kun,{kun=it},label={Text("Kunyomi")})}},confirmButton={TextButton(enabled=ch.isNotBlank()&&meaning.isNotBlank(),onClick={save(Kanji(character=ch,meaning=meaning,onyomi=on,kunyomi=kun))}){Text("Save")}},dismissButton={TextButton(onClick=close){Text("Cancel")}})}
 @Composable private fun EmptyBox(title:String,body:String){Column(Modifier.fillMaxWidth().padding(30.dp),horizontalAlignment=Alignment.CenterHorizontally){Text("日本語",fontSize=30.sp,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Bold);Text(title,fontWeight=FontWeight.Bold,fontSize=18.sp);Text(body,textAlign=TextAlign.Center,color=MaterialTheme.colorScheme.onSurfaceVariant,fontSize=13.sp)}}
 
+
+
+@Composable private fun CompletedToday(progress:List<DailyProgress>,words:List<Vocabulary>){
+ val done=progress.filter{it.status=="done"}.mapNotNull{p->words.firstOrNull{it.id==p.itemId}}
+ if(done.isNotEmpty()) Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth()){
+  Column(Modifier.padding(13.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+   Text("COMPLETED TODAY",fontSize=11.sp,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)
+   done.take(5).forEach{w->Row(verticalAlignment=Alignment.CenterVertically){Text(w.japanese,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary);Text("  —  "+w.meaning,fontSize=12.sp);Spacer(Modifier.weight(1f));Icon(Icons.Rounded.CheckCircle,null,tint=Color(0xFF369766))}}
+   if(done.size>5)Text("and "+(done.size-5)+" more",fontSize=11.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+  }
+ }
+}
