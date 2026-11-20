@@ -65,7 +65,9 @@ val generateLauncherIcon by tasks.registering {
 // Resource merging can start before preBuild on parallel workers, so wire the
 // generator directly to every variant resource-merging task.
 tasks.configureEach {
-    if (name.startsWith("merge") && name.endsWith("Resources")) {
+    if ((name.startsWith("merge") && name.endsWith("Resources")) ||
+        (name.startsWith("generate") && name.endsWith("Resources")) ||
+        (name.startsWith("map") && name.endsWith("SourceSetPaths"))) {
         dependsOn(generateLauncherIcon)
     }
 }
