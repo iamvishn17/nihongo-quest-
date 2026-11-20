@@ -172,7 +172,7 @@ private fun dayStart():Long{val c=java.util.Calendar.getInstance();c.set(11,0);c
    }
   },
   confirmButton={TextButton(onClick={onSelected(if(draftSelected.size==lessons.size)emptySet() else draftSelected);showLessonPicker=false}){Text("Apply")}},
-  dismissButton={Row { TextButton(onClick={draftSelected=lessons.map{it.id}.toSet()}){Text("Select all")};TextButton(onClick={showLessonPicker=false}){Text("Cancel")} } }}
+  dismissButton={Row { TextButton(onClick={draftSelected=lessons.map{it.id}.toSet()}){Text("Select all")};TextButton(onClick={showLessonPicker=false}){Text("Cancel")} }}
  )
 
 }
