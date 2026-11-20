@@ -6,6 +6,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
 android {
     namespace = "com.nihongoquest"
     compileSdk = 35
@@ -13,8 +14,8 @@ android {
         applicationId = "com.nihongoquest"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -23,6 +24,7 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 }
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
@@ -42,18 +44,28 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
 
+// Generate the supplied launcher artwork before Android's resource merger runs.
+// The generated folder is registered as a normal main source-set resource folder.
+val launcherResDir = layout.buildDirectory.dir("generated/res/launcher")
+android.sourceSets.getByName("main").res.srcDir(launcherResDir)
 
 val generateLauncherIcon by tasks.registering {
     val encodedLogo = layout.projectDirectory.file("src/main/assets/nihongo_quest_logo.png.b64")
-    val generatedRes = layout.buildDirectory.dir("generated/res/launcher")
+    val iconFile = launcherResDir.map { it.file("mipmap-xxxhdpi/ic_launcher.png") }
     inputs.file(encodedLogo)
-    outputs.dir(generatedRes)
+    outputs.file(iconFile)
     doLast {
-        val iconFile = generatedRes.get().file("mipmap-xxxhdpi/ic_launcher.png").asFile
-        iconFile.parentFile.mkdirs()
-        iconFile.writeBytes(Base64.getDecoder().decode(encodedLogo.asFile.readText().trim()))
+        val output = iconFile.get().asFile
+        output.parentFile.mkdirs()
+        output.writeBytes(Base64.getMimeDecoder().decode(encodedLogo.asFile.readText()))
+        check(output.length() > 1000L) { "Launcher icon was not generated correctly" }
     }
 }
 
-android.sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/res/launcher"))
-tasks.named("preBuild").configure { dependsOn(generateLauncherIcon) }
+// Resource merging can start before preBuild on parallel workers, so wire the
+// generator directly to every variant resource-merging task.
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Resources")) {
+        dependsOn(generateLauncherIcon)
+    }
+}
