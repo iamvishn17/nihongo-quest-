@@ -2,6 +2,8 @@ package com.nihongoquest
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -40,6 +42,16 @@ private fun dayStart():Long{val c=java.util.Calendar.getInstance();c.set(11,0);c
  var tab by remember{mutableStateOf(Tab.HOME)}
  var dark by remember{mutableStateOf(prefs.getBoolean("dark_theme",false))}
  var dialog by remember{mutableStateOf("")}
+ var pendingImport by remember{mutableStateOf<LessonImport?>(null)}
+ var importTitle by remember{mutableStateOf("")}
+ var importError by remember{mutableStateOf("")}
+ val importLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+  if(uri!=null){
+   val parsed=runCatching{ctx.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use{parseLessonFile(it.readText())}?:throw IllegalArgumentException("Could not open that file.")}
+   parsed.onSuccess{pendingImport=it;importTitle=it.title;dialog="import_lesson_name"}
+   parsed.onFailure{importError=it.message?: "Could not read this lesson file.";dialog="import_error"}
+  }
+ }
  var lessonForWord by remember{mutableIntStateOf(0)}
  var openedLesson by remember{mutableStateOf<Lesson?>(null)}
  var subpage by remember{mutableStateOf("")}
@@ -74,13 +86,46 @@ private fun dayStart():Long{val c=java.util.Calendar.getInstance();c.set(11,0);c
      "kanji"->KanjiPage(kanji,{dialog="kanji"},{scope.launch{dao.deleteKanji(it)}},{subpage=""})
      else->HomePage(tasks,checks,events,words.size,kanji.size,{dialog="task"},{id,b->scope.launch{dao.setTaskCheck(DailyTaskCheck(id,day,b))}},{task->scope.launch{dao.deleteTask(task)}},{subpage="kanji"},{subpage="kana"},{tab=Tab.CARDS})
     }
-    Tab.LESSONS->LessonsPage(lessons,words,openedLesson,{openedLesson=it},{dialog="lesson"},{id->lessonForWord=id;dialog="word"},{lesson->scope.launch{words.filter{it.lesson==lesson.id}.forEach{dao.deleteVocabulary(it)};dao.deleteLesson(lesson)}},{scope.launch{dao.deleteVocabulary(it)}})
+    Tab.LESSONS->LessonsPage(lessons,words,openedLesson,{openedLesson=it},{dialog="lesson_options"},{id->lessonForWord=id;dialog="word"},{lesson->scope.launch{words.filter{it.lesson==lesson.id}.forEach{dao.deleteVocabulary(it)};dao.deleteLesson(lesson)}},{scope.launch{dao.deleteVocabulary(it)}})
     Tab.CARDS->StudyPage(false,words,lessons,selected,{selected=it;prefs.edit().putStringSet("selected_lessons",it.map{n->n.toString()}.toSet()).apply()},dao,day)
     Tab.PRACTICE->StudyPage(true,words,lessons,selected,{selected=it;prefs.edit().putStringSet("selected_lessons",it.map{n->n.toString()}.toSet()).apply()},dao,day)
    }
   }
  }
  if(dialog=="lesson")LessonDialog({dialog=""},{a,b->scope.launch{dao.insertLesson(Lesson(title=a,description=b))};dialog=""})
+ if(dialog=="lesson_options") AlertDialog(
+  onDismissRequest={dialog=""},
+  title={Text("Add a lesson")},
+  text={Text("Create a lesson manually or import vocabulary from a NIHONGO QUEST file.")},
+  confirmButton={TextButton(onClick={dialog="lesson"}){Text("Create manually")}},
+  dismissButton={TextButton(onClick={dialog="";importLauncher.launch(arrayOf("*/*"))}){Text("Import file")}}
+ )
+ if(dialog=="import_lesson_name") AlertDialog(
+  onDismissRequest={dialog=""},
+  title={Text("Name imported lesson")},
+  text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Text("${pendingImport?.items?.size ?: 0} vocabulary entries ready to import.")
+   OutlinedTextField(importTitle,{importTitle=it},label={Text("Lesson name")},singleLine=true)
+  }},
+  confirmButton={TextButton(enabled=importTitle.isNotBlank()&&pendingImport!=null,onClick={
+   val imported=pendingImport
+   val title=importTitle.trim()
+   if(imported!=null) scope.launch {
+    val lessonId=dao.insertLesson(Lesson(title=title,description=imported.description.ifBlank{"Imported vocabulary"})).toInt()
+    imported.items.forEach{item->dao.insertVocabulary(Vocabulary(japanese=item.japanese,reading=item.reading,romaji=item.romaji,meaning=item.meaning,example=item.example,exampleMeaning=item.exampleMeaning,jlpt=item.jlpt,lesson=lessonId,category=item.category,notes=item.notes))}
+    openedLesson=Lesson(id=lessonId,title=title,description=imported.description.ifBlank{"Imported vocabulary"})
+    pendingImport=null
+   }
+   dialog=""
+  }){Text("Import ${pendingImport?.items?.size ?: 0}")}},
+  dismissButton={TextButton(onClick={dialog=""}){Text("Cancel")}}
+ )
+ if(dialog=="import_error") AlertDialog(
+  onDismissRequest={dialog=""},
+  title={Text("Could not import file")},
+  text={Text(importError)},
+  confirmButton={TextButton(onClick={dialog=""}){Text("OK")}}
+ )
  if(dialog=="word")WordDialog({dialog=""}){scope.launch{dao.insertVocabulary(it.copy(lesson=lessonForWord))};dialog=""}
  if(dialog=="kanji")KanjiDialog({dialog=""}){scope.launch{dao.insertKanji(it)};dialog=""}
  if(dialog=="task")TextDialog("Add daily task","Task name","e.g. Learn 10 words",{dialog=""}){scope.launch{dao.insertTask(DailyTask(title=it))};dialog=""}
